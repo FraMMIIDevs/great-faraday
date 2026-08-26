@@ -338,6 +338,7 @@ function Masthead({
     month: "long",
     year: "numeric",
   });
+
   return (
     <header style={mastheadStyle}>
       <div style={{ maxWidth: 980, margin: "0 auto", padding: "18px 20px" }}>
@@ -376,8 +377,30 @@ function Masthead({
                 </button>
               </>
             ) : (
-              <button onClick={onLoginClick} style={loginButtonStyle}>
-                Accedi
+              <button
+                onClick={onLoginClick}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "1.6rem",
+                  cursor: "pointer",
+                  color: "#F1ECDE",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "4px 8px",
+                  borderRadius: "6px",
+                  transition: "background 0.2s",
+                }}
+                title="Accesso redazione"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                📰
               </button>
             )}
           </div>
