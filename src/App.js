@@ -13,6 +13,7 @@ const RUBRICHE = [
 
 const EDITOR_PASSWORD = "FrammiPassword1";
 
+// Articoli di esempio con date aggiornate a oggi (26/08/2026)
 const SEED = [
   {
     id: "seed-1",
@@ -21,7 +22,7 @@ const SEED = [
       "Dubbi su titolare per il rientro dall'infortunio: le scelte dei tecnici",
     author: "F.Caprio",
     category: "Probabili Formazioni",
-    date: "2026-08-24",
+    date: "2026-08-26",
     image: "/probabili formazioni.png",
     body: "A due giorni dal fischio d'inizio restano aperti i ballottaggi in almeno tre squadre. In attacco si gioca sul filo del recupero fisico, mentre a centrocampo alcuni allenatori valutano un cambio di modulo per l'occasione.\n\nLe indicazioni degli allenamenti verranno confermate nella rifinitura, ma la tendenza e' gia' abbastanza chiara per chi deve schierare la formazione entro la deadline.",
   },
@@ -31,7 +32,7 @@ const SEED = [
     subtitle: "Occasioni sotto i 10 crediti che possono cambiare la giornata",
     author: "F.Caprio",
     category: "Consigli Fantacalcio",
-    date: "2026-08-22",
+    date: "2026-08-26",
     image: "/consigli fantacalcio.png",
     body: "Tra i giocatori sottovalutati di questa giornata spicca un centrocampista chiamato spesso a battere le punizioni, oltre a un esterno che gioca contro una difesa in emergenza.\n\nAttenzione anche al portiere di una squadra che in casa concede pochissimo: un jolly economico per chi deve completare la formazione.",
   },
@@ -42,7 +43,7 @@ const SEED = [
       "Distanza ridotta tra domanda e offerta, manca solo l'ultimo tassello",
     author: "F.Caprio",
     category: "Calciomercato",
-    date: "2026-08-20",
+    date: "2026-08-26",
     image: "/calciomercato.png",
     body: "Le parti si sono riavvicinate dopo settimane di stallo. Resta da definire la formula, ma le prime indiscrezioni parlano di un accordo raggiungibile entro pochi giorni.\n\nSullo sfondo restano altre due squadre pronte a inserirsi in caso di fumata nera.",
   },
@@ -119,6 +120,7 @@ export default function App() {
       author: "",
       category: RUBRICHE[0],
       image: "",
+      date: "",
       body: "",
     };
   }
@@ -217,10 +219,12 @@ export default function App() {
     if (form.id) {
       next = articles.map((a) => (a.id === form.id ? { ...form } : a));
     } else {
+      // Se la data non è stata inserita, usa la data di oggi
+      const articleDate = form.date || new Date().toISOString().slice(0, 10);
       const newArticle = {
         ...form,
         id: "art-" + Date.now(),
-        date: new Date().toISOString().slice(0, 10),
+        date: articleDate,
       };
       next = [...articles, newArticle];
     }
@@ -755,6 +759,14 @@ function Editor({
             onChange={(e) => setForm({ ...form, image: e.target.value })}
             style={inputStyle}
             placeholder="https://esempio.com/immagine.jpg"
+          />
+        </Field>
+        <Field label="Data di pubblicazione">
+          <input
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            style={inputStyle}
           />
         </Field>
         <Field label="Testo (usa una riga vuota per separare i paragrafi)">
