@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 
 // ---------- COSTANTI ----------
 const FONT_LINK =
@@ -12,6 +12,11 @@ const RUBRICHE = [
 ];
 
 const EDITOR_PASSWORD = "FrammiPassword1";
+
+// Dimensioni massime per le immagini caricate (px) e qualità JPEG
+const MAX_IMAGE_WIDTH = 1200;
+const MAX_IMAGE_HEIGHT = 800;
+const IMAGE_QUALITY = 0.75;
 
 // Articoli di esempio con date aggiornate a oggi (26/08/2026)
 const SEED = [
@@ -73,6 +78,46 @@ function formatDateIt(iso) {
 
 function editionNumber(articles) {
   return String(articles.length).padStart(3, "0");
+}
+
+// Legge un file immagine, lo ridimensiona/comprime e restituisce una stringa base64 (JPEG)
+function resizeAndCompressImage(file) {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Il file selezionato non è un'immagine."));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Impossibile leggere il file."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Immagine non valida."));
+      img.onload = () => {
+        let { width, height } = img;
+
+        // Calcola il ridimensionamento mantenendo le proporzioni
+        const ratio = Math.min(
+          1,
+          MAX_IMAGE_WIDTH / width,
+          MAX_IMAGE_HEIGHT / height
+        );
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+        resolve(dataUrl);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function Stamp({ category }) {
@@ -145,7 +190,9 @@ export default function App() {
     try {
       localStorage.setItem("articles", JSON.stringify(next));
     } catch (e) {
-      setError("Non sono riuscito a salvare. Riprova.");
+      setError(
+        "Non sono riuscito a salvare: lo spazio del browser è pieno. Prova a eliminare qualche articolo con foto o usa un URL immagine invece di caricarla."
+      );
     }
   }
 
@@ -316,6 +363,7 @@ export default function App() {
           onCancel={() => setView("home")}
           saving={saving}
           error={error}
+          setError={setError}
           isEditing={!!form.id}
         />
       )}
@@ -693,8 +741,34 @@ function Editor({
   onCancel,
   saving,
   error,
+  setError,
   isEditing,
 }) {
+  const [imageMode, setImageMode] = useState("upload"); // "upload" | "url"
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  async function handleFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+    try {
+      const dataUrl = await resizeAndCompressImage(file);
+      setForm((f) => ({ ...f, image: dataUrl }));
+    } catch (err) {
+      setError(err.message || "Errore durante il caricamento dell'immagine.");
+    } finally {
+      setUploading(false);
+      // reset per permettere di ricaricare lo stesso file se serve
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  function handleRemoveImage() {
+    setForm((f) => ({ ...f, image: "" }));
+  }
+
   return (
     <main
       style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px 60px" }}
@@ -753,14 +827,97 @@ function Editor({
             </select>
           </Field>
         </div>
-        <Field label="URL immagine di copertina">
-          <input
-            value={form.image}
-            onChange={(e) => setForm({ ...form, image: e.target.value })}
-            style={inputStyle}
-            placeholder="https://esempio.com/immagine.jpg"
-          />
+
+        <Field label="Immagine di copertina">
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            <button
+              type="button"
+              onClick={() => setImageMode("upload")}
+              style={{
+                ...chipStyle,
+                background: imageMode === "upload" ? "#223050" : "transparent",
+                color: imageMode === "upload" ? "#F1ECDE" : "#4A4436",
+                borderColor: imageMode === "upload" ? "#223050" : "#C9C2AE",
+              }}
+            >
+              Carica dal dispositivo
+            </button>
+            <button
+              type="button"
+              onClick={() => setImageMode("url")}
+              style={{
+                ...chipStyle,
+                background: imageMode === "url" ? "#223050" : "transparent",
+                color: imageMode === "url" ? "#F1ECDE" : "#4A4436",
+                borderColor: imageMode === "url" ? "#223050" : "#C9C2AE",
+              }}
+            >
+              Usa un URL
+            </button>
+          </div>
+
+          {imageMode === "upload" ? (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                style={inputStyle}
+              />
+              <p
+                style={{
+                  fontFamily: "'Rajdhani', sans-serif",
+                  fontSize: "0.7rem",
+                  color: "#8a8270",
+                  marginTop: 6,
+                }}
+              >
+                {uploading
+                  ? "Elaborazione immagine…"
+                  : "La foto viene ridimensionata e compressa automaticamente prima di essere salvata."}
+              </p>
+            </div>
+          ) : (
+            <input
+              value={
+                form.image && form.image.startsWith("data:") ? "" : form.image
+              }
+              onChange={(e) => setForm({ ...form, image: e.target.value })}
+              style={inputStyle}
+              placeholder="https://esempio.com/immagine.jpg"
+            />
+          )}
+
+          {form.image && (
+            <div style={{ marginTop: 12, position: "relative" }}>
+              <img
+                src={form.image}
+                alt="Anteprima"
+                style={{
+                  width: "100%",
+                  maxHeight: 180,
+                  objectFit: "cover",
+                  borderRadius: 6,
+                  border: "1px solid #C9C2AE",
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                style={{
+                  ...dangerButtonStyle,
+                  marginTop: 8,
+                  fontSize: "0.7rem",
+                  padding: "5px 10px",
+                }}
+              >
+                Rimuovi immagine
+              </button>
+            </div>
+          )}
         </Field>
+
         <Field label="Data di pubblicazione">
           <input
             type="date"
@@ -794,7 +951,11 @@ function Editor({
           </p>
         )}
         <div style={{ display: "flex", gap: 10 }}>
-          <button type="submit" disabled={saving} style={newButtonStyle}>
+          <button
+            type="submit"
+            disabled={saving || uploading}
+            style={newButtonStyle}
+          >
             {saving
               ? "Pubblicazione…"
               : isEditing
