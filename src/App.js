@@ -16,7 +16,7 @@ const EDITOR_PASSWORD = "FrammiPassword1";
 // ---------- JSONBIN CONFIGURAZIONE ----------
 // Questi sono i tuoi dati – NON modificarli!
 const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6a8fd84eda38895dfe16a269";
-const JSONBIN_KEY = "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvv0FYxs3lBFI6/Qk/6H58lp4K";
+const JSONBIN_KEY = "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvvOFYxs3lBFl6/Qk/6H58lp4K";
 
 // Dimensioni massime per le immagini caricate (px) e qualità JPEG
 const MAX_IMAGE_WIDTH = 1200;
