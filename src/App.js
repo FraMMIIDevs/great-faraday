@@ -13,12 +13,17 @@ const RUBRICHE = [
 
 const EDITOR_PASSWORD = "FrammiPassword1";
 
+// ---------- JSONBIN CONFIGURAZIONE ----------
+// Questi sono i tuoi dati – NON modificarli!
+const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6a8fd84eda38895dfe16a269";
+const JSONBIN_KEY = "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvv0FYxs3lBFI6/Qk/6H58lp4K";
+
 // Dimensioni massime per le immagini caricate (px) e qualità JPEG
 const MAX_IMAGE_WIDTH = 1200;
 const MAX_IMAGE_HEIGHT = 800;
 const IMAGE_QUALITY = 0.75;
 
-// Articoli di esempio con date aggiornate a oggi (26/08/2026)
+// Articoli di esempio (fallback se JSONBin non funziona)
 const SEED = [
   {
     id: "seed-1",
@@ -80,14 +85,12 @@ function editionNumber(articles) {
   return String(articles.length).padStart(3, "0");
 }
 
-// Legge un file immagine, lo ridimensiona/comprime e restituisce una stringa base64 (JPEG)
 function resizeAndCompressImage(file) {
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
       reject(new Error("Il file selezionato non è un'immagine."));
       return;
     }
-
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Impossibile leggere il file."));
     reader.onload = () => {
@@ -95,8 +98,6 @@ function resizeAndCompressImage(file) {
       img.onerror = () => reject(new Error("Immagine non valida."));
       img.onload = () => {
         let { width, height } = img;
-
-        // Calcola il ridimensionamento mantenendo le proporzioni
         const ratio = Math.min(
           1,
           MAX_IMAGE_WIDTH / width,
@@ -104,13 +105,11 @@ function resizeAndCompressImage(file) {
         );
         width = Math.round(width * ratio);
         height = Math.round(height * ratio);
-
         const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
-
         const dataUrl = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
         resolve(dataUrl);
       };
@@ -152,6 +151,7 @@ export default function App() {
   const [form, setForm] = useState(emptyForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [loginPassword, setLoginPassword] = useState("");
@@ -170,15 +170,60 @@ export default function App() {
     };
   }
 
-  useEffect(() => {
+  // ---------- LEGGI DA JSONBIN ----------
+  async function loadArticles() {
     try {
-      const stored = localStorage.getItem("articles");
-      const parsed = stored ? JSON.parse(stored) : SEED;
-      setArticles(parsed);
+      const response = await fetch(JSONBIN_URL, {
+        headers: { "X-Master-Key": JSONBIN_KEY },
+      });
+      if (!response.ok) {
+        throw new Error("Impossibile caricare gli articoli da JSONBin");
+      }
+      const data = await response.json();
+      const articles = data.record || data;
+      if (Array.isArray(articles) && articles.length > 0) {
+        setArticles(articles);
+        return articles;
+      } else {
+        throw new Error("Nessun articolo trovato su JSONBin");
+      }
     } catch (e) {
+      console.warn("Fallback al SEED", e);
       setArticles(SEED);
+      return SEED;
+    } finally {
+      setLoading(false);
     }
+  }
 
+  // ---------- SALVA SU JSONBIN ----------
+  async function saveArticles(articlesToSave) {
+    try {
+      const response = await fetch(JSONBIN_URL, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Master-Key": JSONBIN_KEY,
+        },
+        body: JSON.stringify(articlesToSave),
+      });
+      if (!response.ok) {
+        throw new Error("Errore durante il salvataggio su JSONBin");
+      }
+      return true;
+    } catch (e) {
+      console.error("Errore salvataggio su JSONBin:", e);
+      try {
+        localStorage.setItem("articles_backup", JSON.stringify(articlesToSave));
+      } catch (localError) {
+        console.error("Salvataggio locale fallito:", localError);
+      }
+      throw e;
+    }
+  }
+
+  useEffect(() => {
+    loadArticles();
     const auth = sessionStorage.getItem("editorAuth");
     if (auth === "true") {
       setIsAuthorized(true);
@@ -187,12 +232,15 @@ export default function App() {
 
   function persist(next) {
     setArticles(next);
-    try {
-      localStorage.setItem("articles", JSON.stringify(next));
-    } catch (e) {
+    saveArticles(next).catch((e) => {
       setError(
-        "Non sono riuscito a salvare: lo spazio del browser è pieno. Prova a eliminare qualche articolo con foto o usa un URL immagine invece di caricarla."
+        "Non sono riuscito a salvare online. I dati sono salvati solo localmente. Riprova più tardi."
       );
+    });
+    try {
+      localStorage.setItem("articles_backup", JSON.stringify(next));
+    } catch (e) {
+      // Ignora
     }
   }
 
@@ -266,7 +314,6 @@ export default function App() {
     if (form.id) {
       next = articles.map((a) => (a.id === form.id ? { ...form } : a));
     } else {
-      // Se la data non è stata inserita, usa la data di oggi
       const articleDate = form.date || new Date().toISOString().slice(0, 10);
       const newArticle = {
         ...form,
@@ -288,7 +335,7 @@ export default function App() {
     setView("home");
   }
 
-  if (!articles) {
+  if (loading || !articles) {
     return (
       <div
         style={{
@@ -300,7 +347,7 @@ export default function App() {
       >
         <link rel="stylesheet" href={FONT_LINK} />
         <p style={{ fontFamily: "'Rajdhani', sans-serif", color: "#5b5445" }}>
-          Apertura dell'edizione…
+          Caricamento articoli…
         </p>
       </div>
     );
@@ -744,7 +791,7 @@ function Editor({
   setError,
   isEditing,
 }) {
-  const [imageMode, setImageMode] = useState("upload"); // "upload" | "url"
+  const [imageMode, setImageMode] = useState("upload");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -760,7 +807,6 @@ function Editor({
       setError(err.message || "Errore durante il caricamento dell'immagine.");
     } finally {
       setUploading(false);
-      // reset per permettere di ricaricare lo stesso file se serve
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
@@ -880,9 +926,7 @@ function Editor({
             </div>
           ) : (
             <input
-              value={
-                form.image && form.image.startsWith("data:") ? "" : form.image
-              }
+              value={form.image && form.image.startsWith("data:") ? "" : form.image}
               onChange={(e) => setForm({ ...form, image: e.target.value })}
               style={inputStyle}
               placeholder="https://esempio.com/immagine.jpg"
