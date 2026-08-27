@@ -15,22 +15,13 @@ const EDITOR_PASSWORD = "FrammiPassword1";
 
 // ---------- JSONBIN CONFIGURAZIONE ----------
 const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6a8fd84eda38895dfe16a269";
-const JSONBIN_KEY = "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvvOFYxs3lBFl6/Qk/6H58lp4K";
+const JSONBIN_KEY =
+  "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvvOFYxs3lBFl6/Qk/6H58lp4K";
 
 // Dimensioni massime per le immagini caricate (px) e qualità JPEG
 const MAX_IMAGE_WIDTH = 1200;
 const MAX_IMAGE_HEIGHT = 800;
 const IMAGE_QUALITY = 0.75;
-
-// Array di nomi da evidenziare nel testo degli articoli
-const NOMI_EVIDENZIATI = [
-  "Conte", "Inzaghi", "Thiago Motta", "Lautaro", "Thuram",
-  "Vlahovic", "Locatelli", "Douglas Luiz", "De Vrij", "Acerbi",
-  "Darmian", "Dumfries", "Baldanzi", "Iling-Junior", "Soulé",
-  "Lobotka", "Belahyane", "Castellanos", "Jonathan David",
-  "Motta", "Gasperini", "Pioli", "Sarri", "Spalletti", "De Rossi",
-  "Zanetti", "Italiano", "Palladino", "Gilardino", "Dionisi"
-];
 
 // ---------- ARTICOLI DI ESEMPIO ----------
 const SEED = [
@@ -126,15 +117,6 @@ function resizeAndCompressImage(file) {
     };
     reader.readAsDataURL(file);
   });
-}
-
-function evidenziaNomi(testo) {
-  let risultato = testo;
-  NOMI_EVIDENZIATI.forEach(nome => {
-    const regex = new RegExp(`\\b${nome}\\b`, 'g');
-    risultato = risultato.replace(regex, `<strong style="color: #9C4A2E; font-weight: 600;">${nome}</strong>`);
-  });
-  return risultato;
 }
 
 // ---------- Funzione per creare un estratto del testo ----------
@@ -266,11 +248,11 @@ export default function App() {
   // Effect separato per leggere l'hash DOPO che articles sono caricati
   useEffect(() => {
     if (!articles) return;
-    
+
     const hash = window.location.hash;
     if (hash) {
-      const id = hash.replace('#', '');
-      const article = articles.find(a => a.id === id);
+      const id = hash.replace("#", "");
+      const article = articles.find((a) => a.id === id);
       if (article) {
         setActiveId(id);
         setView("detail");
@@ -408,7 +390,7 @@ export default function App() {
         edition={editionNumber(articles)}
         onHome={() => {
           setView("home");
-          window.location.hash = '';
+          window.location.hash = "";
         }}
         onNew={() => openEditor(null)}
         isAuthorized={isAuthorized}
@@ -449,7 +431,7 @@ export default function App() {
           article={active}
           onBack={() => {
             setView("home");
-            window.location.hash = '';
+            window.location.hash = "";
           }}
           onEdit={() => openEditor(active)}
           onDelete={() => handleDelete(active.id)}
@@ -635,7 +617,7 @@ function LoginScreen({ password, setPassword, onSubmit, error, onCancel }) {
   );
 }
 
-// ---------- HOME CON ESTRATTI E "LEGGI TUTTO" ----------
+// ---------- HOME CON CARD CLICCABILI ----------
 function Home({
   hero,
   rest,
@@ -709,8 +691,12 @@ function Home({
         </div>
       )}
 
+      {/* ----- ARTICOLO HERO (cliccabile su tutta la card) ----- */}
       {hero && (
-        <article style={heroCardStyle}>
+        <article
+          onClick={() => onOpen(hero.id)}
+          style={{ ...heroCardStyle, cursor: "pointer" }}
+        >
           {hero.image && (
             <img
               src={hero.image}
@@ -732,16 +718,13 @@ function Home({
             {getExcerpt(hero.body.trim().slice(1), 200)}
           </p>
           <div
-            onClick={() => onOpen(hero.id)}
             style={{
               display: "inline-block",
               marginTop: 12,
               fontFamily: "'Rajdhani', sans-serif",
               fontWeight: 600,
               color: "#9C4A2E",
-              cursor: "pointer",
-              textDecoration: "underline",
-              textUnderlineOffset: "2px",
+              fontSize: "0.9rem",
             }}
           >
             Leggi tutto →
@@ -750,9 +733,14 @@ function Home({
         </article>
       )}
 
+      {/* ----- GRIGLIA CARD (cliccabili su tutta la card) ----- */}
       <div style={gridStyle}>
         {rest.map((a) => (
-          <article key={a.id} style={cardStyle}>
+          <article
+            key={a.id}
+            onClick={() => onOpen(a.id)}
+            style={{ ...cardStyle, cursor: "pointer" }}
+          >
             {a.image && (
               <img
                 src={a.image}
@@ -773,17 +761,13 @@ function Home({
               {getExcerpt(a.body, 120)}
             </p>
             <div
-              onClick={() => onOpen(a.id)}
               style={{
                 display: "inline-block",
                 marginTop: 8,
                 fontFamily: "'Rajdhani', sans-serif",
                 fontWeight: 600,
                 color: "#9C4A2E",
-                cursor: "pointer",
                 fontSize: "0.8rem",
-                textDecoration: "underline",
-                textUnderlineOffset: "2px",
               }}
             >
               Leggi tutto →
@@ -842,7 +826,12 @@ function Detail({ article, onBack, onEdit, onDelete, isAuthorized }) {
 
   return (
     <main
-      style={{ maxWidth: 780, margin: "0 auto", padding: "40px 20px 80px", position: "relative" }}
+      style={{
+        maxWidth: 780,
+        margin: "0 auto",
+        padding: "40px 20px 80px",
+        position: "relative",
+      }}
     >
       <button onClick={onBack} style={linkButtonStyle}>
         ← Prima pagina
@@ -884,79 +873,122 @@ function Detail({ article, onBack, onEdit, onDelete, isAuthorized }) {
       {paragraphs.map((p, i) => (
         <p key={i} style={{ ...bodyStyle, marginBottom: 24 }}>
           {i === 0 ? <span style={dropCapStyle}>{p[0]}</span> : null}
-          <span dangerouslySetInnerHTML={{ __html: evidenziaNomi(i === 0 ? p.slice(1) : p) }} />
+          {i === 0 ? p.slice(1) : p}
         </p>
       ))}
 
-      {/* ----- SEZIONE SOCIAL SHARE ----- */}
+      {/* ----- SEZIONE SOCIAL SHARE (impaginazione migliorata) ----- */}
       <div
         style={{
           marginTop: 40,
-          paddingTop: 20,
+          paddingTop: 24,
           borderTop: "1px solid #C9C2AE",
           display: "flex",
-          flexWrap: "wrap",
+          flexDirection: "column",
           alignItems: "center",
           gap: 12,
         }}
       >
-        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: "0.8rem", color: "#5b5445" }}>
-          Condividi questo articolo:
+        <span
+          style={{
+            fontFamily: "'Rajdhani', sans-serif",
+            fontSize: "0.8rem",
+            color: "#5b5445",
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+          }}
+        >
+          Condividi questo articolo
         </span>
-        <a
-          href={`https://twitter.com/intent/tweet?url=${url}&text=${title}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <div
           style={{
-            display: "inline-block",
-            padding: "6px 12px",
-            background: "#1DA1F2",
-            color: "#fff",
-            borderRadius: "4px",
-            fontSize: "0.8rem",
-            textDecoration: "none",
-            fontFamily: "'Rajdhani', sans-serif",
-            fontWeight: 600,
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 10,
           }}
         >
-          🐦 Twitter
-        </a>
-        <a
-          href={`https://www.facebook.com/sharer/sharer.php?u=${url}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-block",
-            padding: "6px 12px",
-            background: "#1877F2",
-            color: "#fff",
-            borderRadius: "4px",
-            fontSize: "0.8rem",
-            textDecoration: "none",
-            fontFamily: "'Rajdhani', sans-serif",
-            fontWeight: 600,
-          }}
-        >
-          📘 Facebook
-        </a>
-        <a
-          href={`https://api.whatsapp.com/send?text=${title}%20${url}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: "inline-block",
-            padding: "6px 12px",
-            background: "#25D366",
-            color: "#fff",
-            borderRadius: "4px",
-            fontSize: "0.8rem",
-            textDecoration: "none",
-            fontFamily: "'Rajdhani', sans-serif",
-            fontWeight: 600,
-          }}
-        >
-          💬 WhatsApp
-        </a>
+          {/* Pulsante X (ex Twitter) - sfondo nero, X bianca */}
+          <a
+            href={`https://twitter.com/intent/tweet?url=${url}&text=${title}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "8px 16px",
+              background: "#000000",
+              color: "#ffffff",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              textDecoration: "none",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 600,
+              transition: "opacity 0.2s",
+              minWidth: "80px",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            <span style={{ marginRight: "6px", fontSize: "1rem" }}>𝕏</span>
+            X
+          </a>
+
+          {/* Pulsante Facebook */}
+          <a
+            href={`https://www.facebook.com/sharer/sharer.php?u=${url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "8px 16px",
+              background: "#1877F2",
+              color: "#fff",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              textDecoration: "none",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 600,
+              transition: "opacity 0.2s",
+              minWidth: "80px",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            <span style={{ marginRight: "6px", fontSize: "1rem" }}>📘</span>
+            Facebook
+          </a>
+
+          {/* Pulsante WhatsApp */}
+          <a
+            href={`https://api.whatsapp.com/send?text=${title}%20${url}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "8px 16px",
+              background: "#25D366",
+              color: "#fff",
+              borderRadius: "6px",
+              fontSize: "0.85rem",
+              textDecoration: "none",
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 600,
+              transition: "opacity 0.2s",
+              minWidth: "80px",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            <span style={{ marginRight: "6px", fontSize: "1rem" }}>💬</span>
+            WhatsApp
+          </a>
+        </div>
       </div>
 
       {isAuthorized && (
@@ -1147,7 +1179,9 @@ function Editor({
             </div>
           ) : (
             <input
-              value={form.image && form.image.startsWith("data:") ? "" : form.image}
+              value={
+                form.image && form.image.startsWith("data:") ? "" : form.image
+              }
               onChange={(e) => setForm({ ...form, image: e.target.value })}
               style={inputStyle}
               placeholder="https://esempio.com/immagine.jpg"
