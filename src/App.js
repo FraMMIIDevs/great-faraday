@@ -14,7 +14,6 @@ const RUBRICHE = [
 const EDITOR_PASSWORD = "FrammiPassword1";
 
 // ---------- JSONBIN CONFIGURAZIONE ----------
-// Questi sono i tuoi dati – NON modificarli!
 const JSONBIN_URL = "https://api.jsonbin.io/v3/b/6a8fd84eda38895dfe16a269";
 const JSONBIN_KEY = "$2a$10$U4sdgXqPm.QzF30B8T859ef3XMqhvvOFYxs3lBFl6/Qk/6H58lp4K";
 
@@ -23,7 +22,17 @@ const MAX_IMAGE_WIDTH = 1200;
 const MAX_IMAGE_HEIGHT = 800;
 const IMAGE_QUALITY = 0.75;
 
-// Articoli di esempio (fallback se JSONBin non funziona)
+// Array di nomi da evidenziare nel testo degli articoli
+const NOMI_EVIDENZIATI = [
+  "Conte", "Inzaghi", "Thiago Motta", "Lautaro", "Thuram",
+  "Vlahovic", "Locatelli", "Douglas Luiz", "De Vrij", "Acerbi",
+  "Darmian", "Dumfries", "Baldanzi", "Iling-Junior", "Soulé",
+  "Lobotka", "Belahyane", "Castellanos", "Jonathan David",
+  "Motta", "Gasperini", "Pioli", "Sarri", "Spalletti", "De Rossi",
+  "Zanetti", "Italiano", "Palladino", "Gilardino", "Dionisi"
+];
+
+// ---------- ARTICOLI DI ESEMPIO ----------
 const SEED = [
   {
     id: "seed-1",
@@ -117,6 +126,27 @@ function resizeAndCompressImage(file) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+function evidenziaNomi(testo) {
+  let risultato = testo;
+  NOMI_EVIDENZIATI.forEach(nome => {
+    const regex = new RegExp(`\\b${nome}\\b`, 'g');
+    risultato = risultato.replace(regex, `<strong style="color: #9C4A2E; font-weight: 600;">${nome}</strong>`);
+  });
+  return risultato;
+}
+
+// ---------- Funzione per creare un estratto del testo ----------
+function getExcerpt(text, maxLength = 150) {
+  if (!text) return "";
+  // Rimuove i doppi a capo e spazi multipli
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= maxLength) return clean;
+  const truncated = clean.substring(0, maxLength);
+  // Taglia all'ultima parola intera
+  const lastSpace = truncated.lastIndexOf(" ");
+  return truncated.substring(0, lastSpace) + "...";
 }
 
 function Stamp({ category }) {
@@ -222,13 +252,31 @@ export default function App() {
     }
   }
 
+  // ---------- EFFECT PER CARICARE ARTICOLI E LEGGERE HASH ----------
   useEffect(() => {
     loadArticles();
+
+    // Controllo autenticazione
     const auth = sessionStorage.getItem("editorAuth");
     if (auth === "true") {
       setIsAuthorized(true);
     }
   }, []);
+
+  // Effect separato per leggere l'hash DOPO che articles sono caricati
+  useEffect(() => {
+    if (!articles) return;
+    
+    const hash = window.location.hash;
+    if (hash) {
+      const id = hash.replace('#', '');
+      const article = articles.find(a => a.id === id);
+      if (article) {
+        setActiveId(id);
+        setView("detail");
+      }
+    }
+  }, [articles]);
 
   function persist(next) {
     setArticles(next);
@@ -358,7 +406,10 @@ export default function App() {
       <link rel="stylesheet" href={FONT_LINK} />
       <Masthead
         edition={editionNumber(articles)}
-        onHome={() => setView("home")}
+        onHome={() => {
+          setView("home");
+          window.location.hash = '';
+        }}
         onNew={() => openEditor(null)}
         isAuthorized={isAuthorized}
         onLogout={handleLogout}
@@ -386,6 +437,7 @@ export default function App() {
           onOpen={(id) => {
             setActiveId(id);
             setView("detail");
+            window.location.hash = id;
           }}
           isAuthorized={isAuthorized}
           onNew={() => openEditor(null)}
@@ -395,7 +447,10 @@ export default function App() {
       {view === "detail" && active && (
         <Detail
           article={active}
-          onBack={() => setView("home")}
+          onBack={() => {
+            setView("home");
+            window.location.hash = '';
+          }}
           onEdit={() => openEditor(active)}
           onDelete={() => handleDelete(active.id)}
           isAuthorized={isAuthorized}
@@ -580,6 +635,7 @@ function LoginScreen({ password, setPassword, onSubmit, error, onCancel }) {
   );
 }
 
+// ---------- HOME CON ESTRATTI E "LEGGI TUTTO" ----------
 function Home({
   hero,
   rest,
@@ -654,7 +710,7 @@ function Home({
       )}
 
       {hero && (
-        <article onClick={() => onOpen(hero.id)} style={heroCardStyle}>
+        <article style={heroCardStyle}>
           {hero.image && (
             <img
               src={hero.image}
@@ -673,15 +729,30 @@ function Home({
           <p style={subtitleStyle}>{hero.subtitle}</p>
           <p style={{ ...bodyStyle, marginTop: 14 }}>
             <span style={dropCapStyle}>{hero.body.trim()[0]}</span>
-            {hero.body.trim().slice(1).split("\n\n")[0]}
+            {getExcerpt(hero.body.trim().slice(1), 200)}
           </p>
+          <div
+            onClick={() => onOpen(hero.id)}
+            style={{
+              display: "inline-block",
+              marginTop: 12,
+              fontFamily: "'Rajdhani', sans-serif",
+              fontWeight: 600,
+              color: "#9C4A2E",
+              cursor: "pointer",
+              textDecoration: "underline",
+              textUnderlineOffset: "2px",
+            }}
+          >
+            Leggi tutto →
+          </div>
           <Byline author={hero.author} date={hero.date} />
         </article>
       )}
 
       <div style={gridStyle}>
         {rest.map((a) => (
-          <article key={a.id} onClick={() => onOpen(a.id)} style={cardStyle}>
+          <article key={a.id} style={cardStyle}>
             {a.image && (
               <img
                 src={a.image}
@@ -698,6 +769,25 @@ function Home({
             <Stamp category={a.category} />
             <h3 style={cardTitleStyle}>{a.title}</h3>
             <p style={cardSubtitleStyle}>{a.subtitle}</p>
+            <p style={{ ...bodyStyle, fontSize: "0.9rem", marginTop: 8 }}>
+              {getExcerpt(a.body, 120)}
+            </p>
+            <div
+              onClick={() => onOpen(a.id)}
+              style={{
+                display: "inline-block",
+                marginTop: 8,
+                fontFamily: "'Rajdhani', sans-serif",
+                fontWeight: 600,
+                color: "#9C4A2E",
+                cursor: "pointer",
+                fontSize: "0.8rem",
+                textDecoration: "underline",
+                textUnderlineOffset: "2px",
+              }}
+            >
+              Leggi tutto →
+            </div>
             <Byline author={a.author} date={a.date} small />
           </article>
         ))}
@@ -711,22 +801,48 @@ function Byline({ author, date, small }) {
     <div
       style={{
         fontFamily: "'Rajdhani', sans-serif",
-        fontSize: small ? "0.68rem" : "0.74rem",
+        fontSize: small ? "0.7rem" : "0.8rem",
         color: "#8a8270",
         marginTop: small ? 10 : 16,
-        letterSpacing: "0.03em",
+        letterSpacing: "0.04em",
       }}
     >
-      {author} · {formatDateIt(date)}
+      <span style={{ fontWeight: 600, color: "#9C4A2E" }}>{author}</span>
+      <span style={{ margin: "0 4px" }}>·</span>
+      <span>{formatDateIt(date)}</span>
     </div>
   );
 }
 
+// ---------- DETTAGLIO CON SOCIAL E PULSANTE TORNA SU ----------
 function Detail({ article, onBack, onEdit, onDelete, isAuthorized }) {
   const paragraphs = article.body.split("\n\n");
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Monitora lo scroll per mostrare/nascondere il pulsante
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollButton(true);
+      } else {
+        setShowScrollButton(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Costruisce gli URL di condivisione
+  const url = encodeURIComponent(window.location.href);
+  const title = encodeURIComponent(article.title);
+
   return (
     <main
-      style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px 60px" }}
+      style={{ maxWidth: 780, margin: "0 auto", padding: "40px 20px 80px", position: "relative" }}
     >
       <button onClick={onBack} style={linkButtonStyle}>
         ← Prima pagina
@@ -750,23 +866,99 @@ function Detail({ article, onBack, onEdit, onDelete, isAuthorized }) {
       <div style={{ marginBottom: 8 }}>
         <Stamp category={article.category} />
       </div>
-      <h2 style={{ ...heroTitleStyle, fontSize: "2.2rem" }}>{article.title}</h2>
+      <h2 style={{ ...heroTitleStyle, fontSize: "2.8rem", color: "#1E1B16" }}>
+        {article.title}
+      </h2>
       <p style={subtitleStyle}>{article.subtitle}</p>
       <Byline author={article.author} date={article.date} />
+
       <div
         style={{
           marginTop: 26,
-          borderTop: "1px solid #C9C2AE",
+          borderTop: "2px solid #9C4A2E",
           paddingTop: 22,
+          width: "80px",
+        }}
+      />
+
+      {paragraphs.map((p, i) => (
+        <p key={i} style={{ ...bodyStyle, marginBottom: 24 }}>
+          {i === 0 ? <span style={dropCapStyle}>{p[0]}</span> : null}
+          <span dangerouslySetInnerHTML={{ __html: evidenziaNomi(i === 0 ? p.slice(1) : p) }} />
+        </p>
+      ))}
+
+      {/* ----- SEZIONE SOCIAL SHARE ----- */}
+      <div
+        style={{
+          marginTop: 40,
+          paddingTop: 20,
+          borderTop: "1px solid #C9C2AE",
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 12,
         }}
       >
-        {paragraphs.map((p, i) => (
-          <p key={i} style={{ ...bodyStyle, marginBottom: 18 }}>
-            {i === 0 ? <span style={dropCapStyle}>{p[0]}</span> : null}
-            {i === 0 ? p.slice(1) : p}
-          </p>
-        ))}
+        <span style={{ fontFamily: "'Rajdhani', sans-serif", fontSize: "0.8rem", color: "#5b5445" }}>
+          Condividi questo articolo:
+        </span>
+        <a
+          href={`https://twitter.com/intent/tweet?url=${url}&text=${title}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            padding: "6px 12px",
+            background: "#1DA1F2",
+            color: "#fff",
+            borderRadius: "4px",
+            fontSize: "0.8rem",
+            textDecoration: "none",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 600,
+          }}
+        >
+          🐦 Twitter
+        </a>
+        <a
+          href={`https://www.facebook.com/sharer/sharer.php?u=${url}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            padding: "6px 12px",
+            background: "#1877F2",
+            color: "#fff",
+            borderRadius: "4px",
+            fontSize: "0.8rem",
+            textDecoration: "none",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 600,
+          }}
+        >
+          📘 Facebook
+        </a>
+        <a
+          href={`https://api.whatsapp.com/send?text=${title}%20${url}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            padding: "6px 12px",
+            background: "#25D366",
+            color: "#fff",
+            borderRadius: "4px",
+            fontSize: "0.8rem",
+            textDecoration: "none",
+            fontFamily: "'Rajdhani', sans-serif",
+            fontWeight: 600,
+          }}
+        >
+          💬 WhatsApp
+        </a>
       </div>
+
       {isAuthorized && (
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button onClick={onEdit} style={secondaryButtonStyle}>
@@ -776,6 +968,35 @@ function Detail({ article, onBack, onEdit, onDelete, isAuthorized }) {
             Elimina
           </button>
         </div>
+      )}
+
+      {/* ----- PULSANTE "TORNA SU" FISSO ----- */}
+      {showScrollButton && (
+        <button
+          onClick={scrollToTop}
+          style={{
+            position: "fixed",
+            bottom: "30px",
+            right: "30px",
+            width: "48px",
+            height: "48px",
+            borderRadius: "50%",
+            background: "#9C4A2E",
+            color: "#F1ECDE",
+            border: "none",
+            fontSize: "1.5rem",
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            transition: "opacity 0.3s",
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          aria-label="Torna su"
+        >
+          ↑
+        </button>
       )}
     </main>
   );
@@ -817,7 +1038,7 @@ function Editor({
 
   return (
     <main
-      style={{ maxWidth: 720, margin: "0 auto", padding: "32px 20px 60px" }}
+      style={{ maxWidth: 780, margin: "0 auto", padding: "40px 20px 80px" }}
     >
       <button onClick={onCancel} style={linkButtonStyle}>
         ← Annulla
@@ -1126,7 +1347,6 @@ const chipStyle = {
 };
 
 const heroCardStyle = {
-  cursor: "pointer",
   borderBottom: "1px solid #C9C2AE",
   paddingBottom: 26,
   marginBottom: 30,
@@ -1140,6 +1360,7 @@ const heroTitleStyle = {
   letterSpacing: "0.01em",
   textTransform: "uppercase",
   margin: "10px 0 8px",
+  color: "#1E1B16",
 };
 
 const subtitleStyle = {
@@ -1152,16 +1373,17 @@ const subtitleStyle = {
 
 const bodyStyle = {
   fontFamily: "'Barlow', sans-serif",
-  fontSize: "1.05rem",
-  lineHeight: 1.7,
+  fontSize: "1.1rem",
+  lineHeight: 1.8,
   color: "#1E1B16",
   whiteSpace: "pre-wrap",
+  textAlign: "justify",
 };
 
 const dropCapStyle = {
   fontFamily: "'Anton', sans-serif",
   fontWeight: 700,
-  fontSize: "2.6rem",
+  fontSize: "3.0rem",
   float: "left",
   lineHeight: "0.8",
   marginRight: "6px",
@@ -1175,7 +1397,6 @@ const gridStyle = {
 };
 
 const cardStyle = {
-  cursor: "pointer",
   borderTop: "1px solid #C9C2AE",
   paddingTop: 14,
 };
